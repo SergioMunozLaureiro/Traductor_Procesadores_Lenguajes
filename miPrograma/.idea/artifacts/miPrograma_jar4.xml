@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="miPrograma:jar4">
+    <output-path>$PROJECT_DIR$/out/artifacts/miPrograma_jar4</output-path>
+    <root id="archive" name="miPrograma.jar">
+      <element id="module-output" name="miPrograma" />
+      <element id="extracted-dir" path="C:/Program Files (x86)/ANTLR/antlr.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="C:/Program Files (x86)/ANTLR/antlr13.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="C:/Program Files (x86)/ANTLR/antlr-4.13.2-complete.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
