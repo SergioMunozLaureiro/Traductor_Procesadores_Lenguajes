@@ -6,6 +6,27 @@ grammar gramatica;
 
 @members {
     Traductor trad = new Traductor();
+
+    public static String toCLiteral(String s) {
+        String inner = s.substring(1, s.length() - 1);
+        inner = inner.replace("\"", "\\\"");
+        return "\"" + inner + "\"";
+    }
+
+    public static List<String> expandCase(String etiqueta) {
+        List<String> res = new ArrayList<>();
+
+        if (etiqueta.contains(":")) {
+            String[] p = etiqueta.split(":");
+            int a = Integer.parseInt(p[0]);
+            int b = Integer.parseInt(p[1]);
+            for (int i = a; i <= b; i++)
+                res.add(String.valueOf(i));
+        } else {
+            res.add(etiqueta);
+        }
+        return res;
+    }
 }
 
 /* ============================
@@ -40,8 +61,11 @@ dcl returns [List<VariableDecl> listaVars]
     : tipo dclp
       {
          $listaVars = $dclp.listaVars;
-         for (VariableDecl v : $listaVars)
+         for (VariableDecl v : $listaVars) {
              v.tipo = $tipo.tipoC;
+             if ($tipo.tipoC.equals("char") && $tipo.long > 0)
+                 v.setDimension($tipo.long);
+         }
       }
     ;
 
@@ -57,19 +81,23 @@ dclp returns [List<VariableDecl> listaVars]
       }
     ;
 
+/* ============================
+   CABECERAS (INTERFACE)
+   ============================ */
+
 cabecera
     : 'INTERFACE' cablist 'END' 'INTERFACE'
-    | 
+    |
     ;
 
 cablist
     : dec_elemento decsubprog
-    | 
+    |
     ;
 
 decsubprog
     : dec_elemento decsubprog
-    | 
+    |
     ;
 
 dec_elemento
@@ -81,12 +109,13 @@ dec_elemento
    TIPOS
    ============================ */
 
-tipo returns [String tipoC]
-    : 'INTEGER'   { $tipoC = "int"; }
-    | 'REAL'      { $tipoC = "float"; }
+tipo returns [String tipoC, int long]
+    : 'INTEGER'   { $tipoC = "int"; $long = -1; }
+    | 'REAL'      { $tipoC = "float"; $long = -1; }
     | 'CHARACTER' charlength
       {
          $tipoC = "char";
+         $long = $charlength.long;
       }
     ;
 
@@ -104,7 +133,7 @@ varlist returns [List<VariableDecl> lista]
       {
          $lista = new ArrayList<>();
          VariableDecl v = new VariableDecl(null, $IDENT.text);
-         if ($init.init != null) v.setInit($init.init);
+         if ($init.valor != null) v.setInit($init.valor);
          $lista.add(v);
          $lista.addAll($varlistp.lista);
       }
@@ -115,16 +144,16 @@ varlistp returns [List<VariableDecl> lista]
       {
          $lista = new ArrayList<>();
          VariableDecl v = new VariableDecl(null, $IDENT.text);
-         if ($init.init != null) v.setInit($init.init);
+         if ($init.valor != null) v.setInit($init.valor);
          $lista.add(v);
          $lista.addAll($varlistp.lista);
       }
     | { $lista = new ArrayList<>(); }
     ;
 
-init returns [String init]
-    : ASSIGN simpvalue { $init = $simpvalue.val; }
-    | { $init = null; }
+init returns [String valor]
+    : ASSIGN simpvalue { $valor = $simpvalue.val; }
+    | { $valor = null; }
     ;
 
 /* ============================
@@ -144,12 +173,17 @@ sentlistp returns [String codigo]
 
 sent returns [String codigo]
     : asignacion { $codigo = $asignacion.codigo + "\n"; }
+    | proc_call SEMI { $codigo = $proc_call.codigo + ";\n"; }
     | 'IF' '(' expcond ')' sentif
       { $codigo = "if(" + $expcond.codigo + ") " + $sentif.codigo + "\n"; }
     | 'DO' sentdo
       { $codigo = $sentdo.codigo + "\n"; }
     | 'SELECT' 'CASE' '(' exp ')' casos 'END' 'SELECT'
-      { $codigo = "// SELECT CASE no implementado\n"; }
+      {
+         $codigo = "switch(" + $exp.codigo + ") {\n" +
+                   trad.indent($casos.codigo) +
+                   "}\n";
+      }
     ;
 
 /* ============================
@@ -179,9 +213,18 @@ sentdo returns [String codigo]
                    trad.indent($sentlist.codigo) +
                    "}";
       }
-    | IDENT ASSIGN doval COMMA doval COMMA doval sentlist 'ENDDO'
+    | IDENT ASSIGN d1=doval COMMA d2=doval COMMA d3=doval sentlist 'ENDDO'
       {
-         $codigo = "// DO loop no implementado\n";
+         String var = $IDENT.text;
+         String ini = $d1.val;
+         String fin = $d2.val;
+         String inc = $d3.val;
+
+         $codigo = "for(" + var + " = " + ini + "; " +
+                           var + " <= " + fin + "; " +
+                           var + " += " + inc + ") {\n" +
+                   trad.indent($sentlist.codigo) +
+                   "}";
       }
     ;
 
@@ -271,13 +314,13 @@ subparamlist returns [String lista]
 
 ctelist
     : COMMA IDENT ASSIGN simpvalue ctelist
-    | 
+    |
     ;
 
 simpvalue returns [String val]
     : NUM_INT_CONST     { $val = $NUM_INT_CONST.text; }
     | NUM_REAL_CONST    { $val = $NUM_REAL_CONST.text; }
-    | STRING_CONST      { $val = $STRING_CONST.text; }
+    | STRING_CONST { $val = toCLiteral($STRING_CONST.text); }
     | NUM_INT_CONST_B   { $val = $NUM_INT_CONST_B.text; }
     | NUM_INT_CONST_O   { $val = $NUM_INT_CONST_O.text; }
     | NUM_INT_CONST_H   { $val = $NUM_INT_CONST_H.text; }
@@ -302,7 +345,7 @@ nomparamlist returns [List<Parametro> lista]
     : IDENT nomparamlistp
       {
          $lista = new ArrayList<>();
-         $lista.add(new Parametro("int", $IDENT.text, false));
+         $lista.add(new Parametro(null, $IDENT.text, false));
          $lista.addAll($nomparamlistp.lista);
       }
     ;
@@ -314,16 +357,43 @@ nomparamlistp returns [List<Parametro> lista]
     ;
 
 /* ============================
-   SUBPROGRAMAS
+   SUBPROGRAMAS (CABECERAS)
    ============================ */
 
 decproc
     : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist 'END' 'SUBROUTINE' IDENT
+      {
+         // Combinar nombres (formal_paramlist) con tipos (dec_s_paramlist)
+         List<Parametro> params = new ArrayList<>();
+
+         for (int i = 0; i < $formal_paramlist.lista.size(); i++) {
+             Parametro p = $formal_paramlist.lista.get(i);
+             Parametro q = $dec_s_paramlist.lista.get(i);
+
+             p.tipo = q.tipo;
+             p.esCadena = q.esCadena;
+         }
+
+         trad.addDecFun("void", $IDENT.text, $formal_paramlist.lista);
+      }
     ;
 
-dec_s_paramlist
+
+dec_s_paramlist returns [List<Parametro> lista]
     : tipo COMMA 'INTENT' '(' tipoparam ')' IDENT SEMI dec_s_paramlist
-    | 
+      {
+         $lista = new ArrayList<>();
+         Parametro p;
+
+         if ($tipo.tipoC.equals("char") && $tipo.long > 0)
+             p = new Parametro("char[" + $tipo.long + "]", $IDENT.text, true);
+         else
+             p = new Parametro($tipo.tipoC, $IDENT.text, true);
+
+         $lista.add(p);
+         $lista.addAll($dec_s_paramlist.lista);
+      }
+    | { $lista = new ArrayList<>(); }
     ;
 
 tipoparam
@@ -331,25 +401,63 @@ tipoparam
     | 'OUT'
     | 'INOUT'
     ;
-
 decfun
     : 'FUNCTION' IDENT '(' nomparamlist ')' tipo '::' IDENT SEMI dec_f_paramlist 'END' 'FUNCTION' IDENT
+      {
+         List<Parametro> params = new ArrayList<>();
+
+         for (int i = 0; i < $nomparamlist.lista.size(); i++) {
+             Parametro p = $nomparamlist.lista.get(i);
+             Parametro q = $dec_f_paramlist.lista.get(i);
+
+             p.tipo = q.tipo;
+             p.esCadena = q.esCadena;
+         }
+
+         trad.addDecFun($tipo.tipoC, $IDENT.text, $nomparamlist.lista);
+      }
     ;
 
-dec_f_paramlist
+dec_f_paramlist returns [List<Parametro> lista]
     : tipo COMMA 'INTENT' '(' 'IN' ')' IDENT SEMI dec_f_paramlist
-    | 
+      {
+         $lista = new ArrayList<>();
+         Parametro p;
+
+         if ($tipo.tipoC.equals("char") && $tipo.long > 0)
+             p = new Parametro("char[" + $tipo.long + "]", $IDENT.text, true);
+         else
+             p = new Parametro($tipo.tipoC, $IDENT.text, true);
+
+         $lista.add(p);
+         $lista.addAll($dec_f_paramlist.lista);
+      }
+    | { $lista = new ArrayList<>(); }
     ;
+
+
+/* ============================
+   SUBPROGRAMAS (IMPLEMENTACIÓN)
+   ============================ */
 
 subproglist
     : codproc subproglist
     | codfun subproglist
-    | 
+    |
     ;
 
 codproc returns [String codigo]
     : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist dcllist sentlist 'END' 'SUBROUTINE' IDENT
       {
+         // Combinar nombres (formal_paramlist) con tipos (dec_s_paramlist)
+         for (int i = 0; i < $formal_paramlist.lista.size(); i++) {
+             Parametro p = $formal_paramlist.lista.get(i);
+             Parametro q = $dec_s_paramlist.lista.get(i);
+
+             p.tipo = q.tipo;
+             p.esCadena = q.esCadena;
+         }
+
          trad.getContexto().entrarProcedimiento($IDENT.text);
          trad.addProcedimiento($IDENT.text, $formal_paramlist.lista, $dcllist.listaVars, $sentlist.codigo);
          trad.getContexto().salir();
@@ -357,9 +465,19 @@ codproc returns [String codigo]
       }
     ;
 
+
 codfun returns [String codigo]
     : 'FUNCTION' IDENT '(' nomparamlist ')' tipo '::' IDENT SEMI dec_f_paramlist dcllist sentlist IDENT ASSIGN exp SEMI 'END' 'FUNCTION' IDENT
       {
+         // Combinar nombres (nomparamlist) con tipos (dec_f_paramlist)
+         for (int i = 0; i < $nomparamlist.lista.size(); i++) {
+             Parametro p = $nomparamlist.lista.get(i);
+             Parametro q = $dec_f_paramlist.lista.get(i);
+
+             p.tipo = q.tipo;
+             p.esCadena = q.esCadena;
+         }
+
          trad.getContexto().entrarFuncion($IDENT.text, $tipo.tipoC);
 
          String cuerpo = $sentlist.codigo + "return " + $exp.codigo + ";";
@@ -370,6 +488,7 @@ codfun returns [String codigo]
          $codigo = "";
       }
     ;
+
 
 /* ============================
    CONDICIONES
@@ -394,8 +513,8 @@ oplog
     ;
 
 factorcond returns [String codigo]
-    : exp opcomp exp
-      { $codigo = $exp(0).codigo + $opcomp.text + $exp(1).codigo; }
+    : e1=exp opcomp e2=exp
+      { $codigo = $e1.codigo + $opcomp.text + $e2.codigo; }
     | '(' expcond ')'
       { $codigo = "(" + $expcond.codigo + ")"; }
     | '.NOT.' factorcond
@@ -413,34 +532,77 @@ opcomp
     | NE
     ;
 
-doval
-    : NUM_INT_CONST
-    | IDENT
+/* === BLOQUE 5: doval === */
+
+doval returns [String val]
+    : NUM_INT_CONST { $val = $NUM_INT_CONST.text; }
+    | IDENT         { $val = $IDENT.text; }
     ;
 
-casos
+/* ============================
+   SELECT CASE
+   ============================ */
+
+casos returns [String codigo]
     : 'CASE' casosp
-    | 
+      { $codigo = $casosp.codigo; }
+    | { $codigo = ""; }
     ;
 
-casosp
+casosp returns [String codigo]
     : '(' etiquetas ')' sentlist casos
+      {
+         List<String> lista = $etiquetas.lista;
+         StringBuilder sb = new StringBuilder();
+
+         for (String e : lista) {
+             sb.append("case ").append(e).append(":\n");
+         }
+
+         sb.append(trad.indent($sentlist.codigo));
+         sb.append("break;\n");
+         sb.append($casos.codigo);
+
+         $codigo = sb.toString();
+      }
     | 'DEFAULT' sentlist
+      {
+         $codigo = "default:\n" +
+                   trad.indent($sentlist.codigo) +
+                   "break;\n";
+      }
     ;
 
-etiquetas
+etiquetas returns [List<String> lista]
     : simpvalue etiquetasp
+      {
+         $lista = new ArrayList<>();
+         $lista.addAll(expandCase($simpvalue.val));
+         $lista.addAll($etiquetasp.lista);
+      }
     | COLON simpvalue
+      {
+         $lista = expandCase(":" + $simpvalue.val);
+      }
     ;
 
-etiquetasp
+etiquetasp returns [List<String> lista]
     : listaetiquetas
+      { $lista = $listaetiquetas.lista; }
     | COLON simpvaluep
+      {
+         $lista = expandCase($simpvaluep.val);
+      }
     ;
 
-listaetiquetas
+listaetiquetas returns [List<String> lista]
     : COMMA simpvalue listaetiquetas
-    | 
+      {
+         $lista = new ArrayList<>();
+         $lista.addAll(expandCase($simpvalue.val));
+         $lista.addAll($listaetiquetas.lista);
+      }
+    | { $lista = new ArrayList<>(); }
     ;
 
 /* ============================

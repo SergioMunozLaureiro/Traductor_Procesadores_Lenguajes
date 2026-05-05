@@ -1,4 +1,7 @@
-// Generated from //10.97.0.21/Home_VDI$/s.munozl.2023/Documents/miPrograma/src/gramatica.g4 by ANTLR 4.13.2
+// Generated from src/gramatica.g4 by ANTLR 4.13.2
+
+    import java.util.*;
+
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**
@@ -87,46 +90,6 @@ public interface gramaticaListener extends ParseTreeListener {
 	 */
 	void exitDec_elemento(gramaticaParser.Dec_elementoContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#sentlist}.
-	 * @param ctx the parse tree
-	 */
-	void enterSentlist(gramaticaParser.SentlistContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#sentlist}.
-	 * @param ctx the parse tree
-	 */
-	void exitSentlist(gramaticaParser.SentlistContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#sentlistp}.
-	 * @param ctx the parse tree
-	 */
-	void enterSentlistp(gramaticaParser.SentlistpContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#sentlistp}.
-	 * @param ctx the parse tree
-	 */
-	void exitSentlistp(gramaticaParser.SentlistpContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#ctelist}.
-	 * @param ctx the parse tree
-	 */
-	void enterCtelist(gramaticaParser.CtelistContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#ctelist}.
-	 * @param ctx the parse tree
-	 */
-	void exitCtelist(gramaticaParser.CtelistContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#simpvalue}.
-	 * @param ctx the parse tree
-	 */
-	void enterSimpvalue(gramaticaParser.SimpvalueContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#simpvalue}.
-	 * @param ctx the parse tree
-	 */
-	void exitSimpvalue(gramaticaParser.SimpvalueContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link gramaticaParser#tipo}.
 	 * @param ctx the parse tree
 	 */
@@ -177,85 +140,25 @@ public interface gramaticaListener extends ParseTreeListener {
 	 */
 	void exitInit(gramaticaParser.InitContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#decproc}.
+	 * Enter a parse tree produced by {@link gramaticaParser#sentlist}.
 	 * @param ctx the parse tree
 	 */
-	void enterDecproc(gramaticaParser.DecprocContext ctx);
+	void enterSentlist(gramaticaParser.SentlistContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#decproc}.
+	 * Exit a parse tree produced by {@link gramaticaParser#sentlist}.
 	 * @param ctx the parse tree
 	 */
-	void exitDecproc(gramaticaParser.DecprocContext ctx);
+	void exitSentlist(gramaticaParser.SentlistContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#formal_paramlist}.
+	 * Enter a parse tree produced by {@link gramaticaParser#sentlistp}.
 	 * @param ctx the parse tree
 	 */
-	void enterFormal_paramlist(gramaticaParser.Formal_paramlistContext ctx);
+	void enterSentlistp(gramaticaParser.SentlistpContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#formal_paramlist}.
+	 * Exit a parse tree produced by {@link gramaticaParser#sentlistp}.
 	 * @param ctx the parse tree
 	 */
-	void exitFormal_paramlist(gramaticaParser.Formal_paramlistContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#nomparamlist}.
-	 * @param ctx the parse tree
-	 */
-	void enterNomparamlist(gramaticaParser.NomparamlistContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#nomparamlist}.
-	 * @param ctx the parse tree
-	 */
-	void exitNomparamlist(gramaticaParser.NomparamlistContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#nomparamlistp}.
-	 * @param ctx the parse tree
-	 */
-	void enterNomparamlistp(gramaticaParser.NomparamlistpContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#nomparamlistp}.
-	 * @param ctx the parse tree
-	 */
-	void exitNomparamlistp(gramaticaParser.NomparamlistpContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#dec_s_paramlist}.
-	 * @param ctx the parse tree
-	 */
-	void enterDec_s_paramlist(gramaticaParser.Dec_s_paramlistContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#dec_s_paramlist}.
-	 * @param ctx the parse tree
-	 */
-	void exitDec_s_paramlist(gramaticaParser.Dec_s_paramlistContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#tipoparam}.
-	 * @param ctx the parse tree
-	 */
-	void enterTipoparam(gramaticaParser.TipoparamContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#tipoparam}.
-	 * @param ctx the parse tree
-	 */
-	void exitTipoparam(gramaticaParser.TipoparamContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#decfun}.
-	 * @param ctx the parse tree
-	 */
-	void enterDecfun(gramaticaParser.DecfunContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#decfun}.
-	 * @param ctx the parse tree
-	 */
-	void exitDecfun(gramaticaParser.DecfunContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#dec_f_paramlist}.
-	 * @param ctx the parse tree
-	 */
-	void enterDec_f_paramlist(gramaticaParser.Dec_f_paramlistContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#dec_f_paramlist}.
-	 * @param ctx the parse tree
-	 */
-	void exitDec_f_paramlist(gramaticaParser.Dec_f_paramlistContext ctx);
+	void exitSentlistp(gramaticaParser.SentlistpContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link gramaticaParser#sent}.
 	 * @param ctx the parse tree
@@ -397,6 +300,116 @@ public interface gramaticaListener extends ParseTreeListener {
 	 */
 	void exitSubparamlist(gramaticaParser.SubparamlistContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#ctelist}.
+	 * @param ctx the parse tree
+	 */
+	void enterCtelist(gramaticaParser.CtelistContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#ctelist}.
+	 * @param ctx the parse tree
+	 */
+	void exitCtelist(gramaticaParser.CtelistContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#simpvalue}.
+	 * @param ctx the parse tree
+	 */
+	void enterSimpvalue(gramaticaParser.SimpvalueContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#simpvalue}.
+	 * @param ctx the parse tree
+	 */
+	void exitSimpvalue(gramaticaParser.SimpvalueContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#simpvaluep}.
+	 * @param ctx the parse tree
+	 */
+	void enterSimpvaluep(gramaticaParser.SimpvaluepContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#simpvaluep}.
+	 * @param ctx the parse tree
+	 */
+	void exitSimpvaluep(gramaticaParser.SimpvaluepContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#formal_paramlist}.
+	 * @param ctx the parse tree
+	 */
+	void enterFormal_paramlist(gramaticaParser.Formal_paramlistContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#formal_paramlist}.
+	 * @param ctx the parse tree
+	 */
+	void exitFormal_paramlist(gramaticaParser.Formal_paramlistContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#nomparamlist}.
+	 * @param ctx the parse tree
+	 */
+	void enterNomparamlist(gramaticaParser.NomparamlistContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#nomparamlist}.
+	 * @param ctx the parse tree
+	 */
+	void exitNomparamlist(gramaticaParser.NomparamlistContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#nomparamlistp}.
+	 * @param ctx the parse tree
+	 */
+	void enterNomparamlistp(gramaticaParser.NomparamlistpContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#nomparamlistp}.
+	 * @param ctx the parse tree
+	 */
+	void exitNomparamlistp(gramaticaParser.NomparamlistpContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#decproc}.
+	 * @param ctx the parse tree
+	 */
+	void enterDecproc(gramaticaParser.DecprocContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#decproc}.
+	 * @param ctx the parse tree
+	 */
+	void exitDecproc(gramaticaParser.DecprocContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#dec_s_paramlist}.
+	 * @param ctx the parse tree
+	 */
+	void enterDec_s_paramlist(gramaticaParser.Dec_s_paramlistContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#dec_s_paramlist}.
+	 * @param ctx the parse tree
+	 */
+	void exitDec_s_paramlist(gramaticaParser.Dec_s_paramlistContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#tipoparam}.
+	 * @param ctx the parse tree
+	 */
+	void enterTipoparam(gramaticaParser.TipoparamContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#tipoparam}.
+	 * @param ctx the parse tree
+	 */
+	void exitTipoparam(gramaticaParser.TipoparamContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#decfun}.
+	 * @param ctx the parse tree
+	 */
+	void enterDecfun(gramaticaParser.DecfunContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#decfun}.
+	 * @param ctx the parse tree
+	 */
+	void exitDecfun(gramaticaParser.DecfunContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link gramaticaParser#dec_f_paramlist}.
+	 * @param ctx the parse tree
+	 */
+	void enterDec_f_paramlist(gramaticaParser.Dec_f_paramlistContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link gramaticaParser#dec_f_paramlist}.
+	 * @param ctx the parse tree
+	 */
+	void exitDec_f_paramlist(gramaticaParser.Dec_f_paramlistContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link gramaticaParser#subproglist}.
 	 * @param ctx the parse tree
 	 */
@@ -526,16 +539,6 @@ public interface gramaticaListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitEtiquetasp(gramaticaParser.EtiquetaspContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link gramaticaParser#simpvaluep}.
-	 * @param ctx the parse tree
-	 */
-	void enterSimpvaluep(gramaticaParser.SimpvaluepContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link gramaticaParser#simpvaluep}.
-	 * @param ctx the parse tree
-	 */
-	void exitSimpvaluep(gramaticaParser.SimpvaluepContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link gramaticaParser#listaetiquetas}.
 	 * @param ctx the parse tree

@@ -1,8 +1,9 @@
 public class VariableDecl {
-    public String tipo;       // int, float, char, char[n]
-    public String nombre;
-    public String init;       // inicialización opcional
-    public int dimension;     // para CHARACTER(n)
+
+    public String tipo;      // int, float, char
+    public String nombre;    // nombre de la variable
+    public String init;      // inicialización opcional
+    public int dimension;    // para char[n], -1 si no tiene
 
     public VariableDecl(String tipo, String nombre) {
         this.tipo = tipo;
@@ -19,7 +20,9 @@ public class VariableDecl {
         this.dimension = dim;
     }
 
-    @Override
+
+
+@Override
     public String toString() {
         StringBuilder sb = new StringBuilder(tipo);
 

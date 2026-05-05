@@ -1,44 +1,56 @@
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public class Contexto {
-    public boolean enFuncion = false;
-    public boolean enProcedimiento = false;
-    public boolean enMain = false;
 
-    public String nombreFuncionActual = null;
-    public String tipoFuncionActual = null;
+    private enum TipoContexto { MAIN, FUNCION, PROC }
 
-    public void entrarFuncion(String nombre, String tipo) {
-        enFuncion = true;
-        enProcedimiento = false;
-        enMain = false;
-        nombreFuncionActual = nombre;
-        tipoFuncionActual = tipo;
+    private static class Entrada {
+        TipoContexto tipo;
+        String nombreFuncion;
+        String tipoRetorno;
+
+        Entrada(TipoContexto t, String n, String r) {
+            tipo = t;
+            nombreFuncion = n;
+            tipoRetorno = r;
+        }
+    }
+
+    private final Deque<Entrada> pila = new ArrayDeque<>();
+
+    // ============================
+    // ENTRADA Y SALIDA DE CONTEXTOS
+    // ============================
+
+    public void entrarMain() {
+        pila.push(new Entrada(TipoContexto.MAIN, null, null));
+    }
+
+    public void entrarFuncion(String nombre, String tipoRetorno) {
+
+        pila.push(new Entrada(TipoContexto.FUNCION, nombre, tipoRetorno));
     }
 
     public void entrarProcedimiento(String nombre) {
-        enFuncion = false;
-        enProcedimiento = true;
-        enMain = false;
-        nombreFuncionActual = nombre;
-        tipoFuncionActual = "void";
-    }
-
-    public void entrarMain() {
-        enFuncion = false;
-        enProcedimiento = false;
-        enMain = true;
-        nombreFuncionActual = "main";
-        tipoFuncionActual = "void";
+        pila.push(new Entrada(TipoContexto.PROC, nombre, null));
     }
 
     public void salir() {
-        enFuncion = false;
-        enProcedimiento = false;
-        enMain = false;
-        nombreFuncionActual = null;
-        tipoFuncionActual = null;
+        if (!pila.isEmpty()) pila.pop();
     }
 
-    public boolean esAsignacionDeRetorno(String id) {
-        return enFuncion && nombreFuncionActual.equals(id);
+    // ============================
+    // DETECCIÓN DE RETURN
+    // ============================
+
+    public boolean esAsignacionDeRetorno(String ident) {
+        if (pila.isEmpty()) return false;
+
+        Entrada e = pila.peek();
+
+        // Solo en funciones: fun = expr → return expr;
+        return e.tipo == TipoContexto.FUNCION && e.nombreFuncion.equals(ident);
     }
+
 }
