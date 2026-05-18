@@ -41,6 +41,11 @@ public class Traductor {
         defines.add(new Define(ident, valor));
     }
 
+    public void addDefines(List<String[]> pares) {
+        for (String[] par : pares)
+            defines.add(new Define(par[0], par[1]));
+    }
+
     // ============================================================
     // PROTOTIPOS
     // ============================================================
@@ -81,10 +86,11 @@ public class Traductor {
             vars.add(0, ret);
         }
 
-        funciones.add(new Funcion(nombre, tipo, params, vars, cuerpo));
+        String cuerpoSeguro = cuerpo != null ? cuerpo : "";
+        funciones.add(new Funcion(nombre, tipo, params, vars, cuerpoSeguro));
 
-        // ★ NUEVO — Comprobación diferida
-        comprobacionesPendientes.add(() -> detectarVariablesNoDeclaradas(vars, params, cuerpo));
+        // Comprobación diferida
+        comprobacionesPendientes.add(() -> detectarVariablesNoDeclaradas(vars, params, cuerpoSeguro));
     }
 
     public void addProcedimiento(String nombre, List<Parametro> params,
@@ -99,10 +105,11 @@ public class Traductor {
             }
         }
 
-        procedimientos.add(new Procedimiento(nombre, params, vars, cuerpo));
+        String cuerpoSeguro = cuerpo != null ? cuerpo : "";
+        procedimientos.add(new Procedimiento(nombre, params, vars, cuerpoSeguro));
 
-        // ★ NUEVO — Comprobación diferida
-        comprobacionesPendientes.add(() -> detectarVariablesNoDeclaradas(vars, params, cuerpo));
+        // Comprobación diferida
+        comprobacionesPendientes.add(() -> detectarVariablesNoDeclaradas(vars, params, cuerpoSeguro));
     }
 
     // ============================================================
@@ -110,13 +117,13 @@ public class Traductor {
     // ============================================================
 
     public void generarMain(List<VariableDecl> vars, String sentencias) {
-        this.mainVars = vars;
-        this.mainCodigo = sentencias;
+        this.mainVars = vars != null ? vars : new ArrayList<>();
+        this.mainCodigo = sentencias != null ? sentencias : "";
 
-        for (VariableDecl v : vars)
+        for (VariableDecl v : this.mainVars)
             variablesGlobales.add(v.nombre);
 
-        detectarVariablesNoDeclaradas(vars, null, sentencias);
+        detectarVariablesNoDeclaradas(this.mainVars, null, this.mainCodigo);
     }
 
     // ============================================================
@@ -245,30 +252,46 @@ public class Traductor {
 
         if (params == null) return listaArgs;
 
-        String[] args = listaArgs.isEmpty() ? new String[0] : listaArgs.split(",");
+        // Split respetando paréntesis anidados
+        List<String> args = new ArrayList<>();
+        if (!listaArgs.isEmpty()) {
+            int depth = 0;
+            StringBuilder cur = new StringBuilder();
+            for (char c : listaArgs.toCharArray()) {
+                if (c == '(') { depth++; cur.append(c); }
+                else if (c == ')') { depth--; cur.append(c); }
+                else if (c == ',' && depth == 0) {
+                    args.add(cur.toString().trim());
+                    cur.setLength(0);
+                } else {
+                    cur.append(c);
+                }
+            }
+            if (cur.length() > 0) args.add(cur.toString().trim());
+        }
 
-        if (args.length != params.size()) {
+        if (args.size() != params.size()) {
             error("Número incorrecto de argumentos en llamada a " + nombre +
-                    ": se esperaban " + params.size() + ", se recibieron " + args.length);
+                    ": se esperaban " + params.size() + ", se recibieron " + args.size());
         }
 
         StringBuilder sb = new StringBuilder();
 
-        for (int i = 0; i < args.length && i < params.size(); i++) {
-            String arg = args[i].trim();
+        for (int i = 0; i < args.size() && i < params.size(); i++) {
+            String arg = args.get(i);
             Parametro p = params.get(i);
 
-            if (p.esReferencia && !arg.matches("[A-Za-z_][A-Za-z0-9_]*")) {
-                error("El parámetro " + p.nombre + " de " + nombre +
-                        " debe pasarse por referencia (variable), no expresión.");
+            if (p.esReferencia && !arg.trim().matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                error("El parámetro '" + p.nombre + "' de '" + nombre +
+                        "' es OUT/INOUT y debe recibir una variable simple, no una expresión: '" + arg.trim() + "'");
             }
 
             if (p.esReferencia)
-                sb.append("&").append(arg);
+                sb.append("&").append(arg.trim());
             else
-                sb.append(arg);
+                sb.append(arg.trim());
 
-            if (i < args.length - 1)
+            if (i < args.size() - 1)
                 sb.append(", ");
         }
 
@@ -280,6 +303,10 @@ public class Traductor {
     // ============================================================
 
     private void detectarVariablesNoDeclaradas(List<VariableDecl> declaradas, List<Parametro> params, String cuerpo) {
+
+        // Si el cuerpo es null (puede ocurrir cuando ANTLR recupera de un error
+        // sintáctico y un atributo queda sin inicializar), no hay nada que analizar.
+        if (cuerpo == null) return;
 
         Set<String> nombresValidos = new HashSet<>();
 
@@ -301,6 +328,7 @@ public class Traductor {
 
         for (String tok : tokens) {
             if (tok.isEmpty()) continue;
+            if (tok.equals("null")) continue;  // artefacto de concatenación Java null+"" tras error sintáctico
 
             if (tok.matches("[0-9]+")) continue;
             if (tok.equalsIgnoreCase("TRUE") || tok.equalsIgnoreCase("FALSE")) continue;

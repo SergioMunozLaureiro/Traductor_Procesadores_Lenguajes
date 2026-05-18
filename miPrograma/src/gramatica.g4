@@ -13,19 +13,10 @@ grammar gramatica;
         return "\"" + inner + "\"";
     }
 
-    public static List<String> expandCase(String etiqueta) {
-        List<String> res = new ArrayList<>();
-
-        if (etiqueta.contains(":")) {
-            String[] p = etiqueta.split(":");
-            int a = Integer.parseInt(p[0]);
-            int b = Integer.parseInt(p[1]);
-            for (int i = a; i <= b; i++)
-                res.add(String.valueOf(i));
-        } else {
-            res.add(etiqueta);
-        }
-        return res;
+    // Evita que concatenaciones con atributos null (tras recuperación de error)
+    // produzcan el string literal "null"
+    public static String s(String v) {
+        return v != null ? v : "";
     }
 }
 
@@ -73,6 +64,7 @@ dclp returns [List<VariableDecl> listaVars]
     : COMMA 'PARAMETER' '::' IDENT ASSIGN simpvalue ctelist SEMI
       {
          trad.addDefine($IDENT.text, $simpvalue.val);
+         trad.addDefines($ctelist.pares);
          $listaVars = new ArrayList<>();
       }
     | '::' varlist SEMI
@@ -162,26 +154,26 @@ init returns [String valor]
 
 sentlist returns [String codigo]
     : sent sentlistp
-      { $codigo = $sent.codigo + $sentlistp.codigo; }
+      { $codigo = s($sent.codigo) + s($sentlistp.codigo); }
     ;
 
 sentlistp returns [String codigo]
     : sent sentlistp
-      { $codigo = $sent.codigo + $sentlistp.codigo; }
+      { $codigo = s($sent.codigo) + s($sentlistp.codigo); }
     | { $codigo = ""; }
     ;
 
 sent returns [String codigo]
-    : asignacion { $codigo = $asignacion.codigo + "\n"; }
-    | proc_call SEMI { $codigo = $proc_call.codigo + ";\n"; }
+    : asignacion { $codigo = s($asignacion.codigo) + "\n"; }
+    | proc_call SEMI { $codigo = s($proc_call.codigo) + ";\n"; }
     | 'IF' '(' expcond ')' sentif
-      { $codigo = "if(" + $expcond.codigo + ") " + $sentif.codigo + "\n"; }
+      { $codigo = "if(" + s($expcond.codigo) + ") " + s($sentif.codigo) + "\n"; }
     | 'DO' sentdo
-      { $codigo = $sentdo.codigo + "\n"; }
+      { $codigo = s($sentdo.codigo) + "\n"; }
     | 'SELECT' 'CASE' '(' exp ')' casos 'END' 'SELECT'
       {
-         $codigo = "switch(" + $exp.codigo + ") {\n" +
-                   trad.indent($casos.codigo) +
+         $codigo = "switch(" + s($exp.codigo) + ") {\n" +
+                   trad.indent(s($casos.codigo)) +
                    "}\n";
       }
     ;
@@ -237,16 +229,16 @@ sentdo returns [String codigo]
 
 sentif returns [String codigo]
     : sent
-      { $codigo = "{\n" + trad.indent($sent.codigo) + "}\n"; }
+      { $codigo = "{\n" + trad.indent(s($sent.codigo)) + "}\n"; }
     | 'THEN' sentlist sentthen
-      { $codigo = "{\n" + trad.indent($sentlist.codigo) + "}" + $sentthen.codigo + "\n"; }
+      { $codigo = "{\n" + trad.indent(s($sentlist.codigo)) + "}" + s($sentthen.codigo) + "\n"; }
     ;
 
 sentthen returns [String codigo]
     : 'ENDIF'
       { $codigo = ""; }
     | 'ELSE' sentlist 'ENDIF'
-      { $codigo = " else {\n" + trad.indent($sentlist.codigo) + "}\n"; }
+      { $codigo = " else {\n" + trad.indent(s($sentlist.codigo)) + "}\n"; }
     ;
 
 /* ============================
@@ -316,9 +308,14 @@ subparamlist returns [String lista]
    CONSTANTES
    ============================ */
 
-ctelist
+ctelist returns [List<String[]> pares]
     : COMMA IDENT ASSIGN simpvalue ctelist
-    |
+      {
+         $pares = new ArrayList<>();
+         $pares.add(new String[]{ $IDENT.text, $simpvalue.val });
+         $pares.addAll($ctelist.pares);
+      }
+    | { $pares = new ArrayList<>(); }
     ;
 simpvalue returns [String val]
     : NUM_INT_CONST     { $val = $NUM_INT_CONST.text; }
@@ -391,15 +388,13 @@ nomparamlistp returns [List<Parametro> lista]
 decproc
     : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist 'END' 'SUBROUTINE' IDENT
       {
-         // Combinar nombres (formal_paramlist) con tipos (dec_s_paramlist)
-         List<Parametro> params = new ArrayList<>();
-
          for (int i = 0; i < $formal_paramlist.lista.size(); i++) {
              Parametro p = $formal_paramlist.lista.get(i);
              Parametro q = $dec_s_paramlist.lista.get(i);
 
              p.tipo = q.tipo;
              p.esCadena = q.esCadena;
+             p.esReferencia = q.esReferencia;
          }
 
          trad.addDecFun("void", $IDENT.text, $formal_paramlist.lista);
@@ -492,13 +487,13 @@ subproglist
 codproc returns [String codigo]
     : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist dcllist sentlist 'END' 'SUBROUTINE' IDENT
       {
-         // Combinar nombres (formal_paramlist) con tipos (dec_s_paramlist)
          for (int i = 0; i < $formal_paramlist.lista.size(); i++) {
              Parametro p = $formal_paramlist.lista.get(i);
              Parametro q = $dec_s_paramlist.lista.get(i);
 
              p.tipo = q.tipo;
              p.esCadena = q.esCadena;
+             p.esReferencia = q.esReferencia;
          }
          if (!($IDENT(0).getText().equals($IDENT(1).getText()))) {
 
@@ -518,7 +513,7 @@ codproc returns [String codigo]
     ;
 codfun returns [String nombreRetorno]
     : 'FUNCTION' IDENT '(' nomparamlist ')' tipo '::' IDENT SEMI dec_f_paramlist
-      dcllist sentlist IDENT ASSIGN exp SEMI
+      dcllist sentlist
       'END' 'FUNCTION' IDENT
       {
          for (int i = 0; i < $nomparamlist.lista.size(); i++) {
@@ -528,8 +523,8 @@ codfun returns [String nombreRetorno]
              p.esCadena = q.esCadena;
          }
 
-         // Comprobar nombre de función (IDENT(0) vs IDENT(3))
-         if (!($IDENT(0).getText().equals($IDENT(3).getText()))) {
+         // Comprobar nombre de función (IDENT(0) vs IDENT(2))
+         if (!($IDENT(0).getText().equals($IDENT(2).getText()))) {
              trad.error("Nombre de subprograma no coincide");
          }
 
@@ -537,10 +532,8 @@ codfun returns [String nombreRetorno]
 
          trad.getContexto().entrarFuncion($IDENT(0).getText(), $tipo.tipoC, $nomparamlist.lista);
 
-         String cuerpo = $sentlist.codigo + "return " + $exp.codigo + ";";
-
          trad.addFuncion($IDENT(0).getText(), $tipo.tipoC, $nomparamlist.lista,
-                         $dcllist.listaVars, cuerpo, $nombreRetorno);
+                         $dcllist.listaVars, $sentlist.codigo, $nombreRetorno);
 
          trad.getContexto().salir();
       }
@@ -585,7 +578,7 @@ factorcond returns [String codigo]
     | '.NOT.' factorcond
       { $codigo = "!" + $factorcond.codigo; }
     | CONST_BOOL
-      { $codigo = $CONST_BOOL.text; }
+      { $codigo = $CONST_BOOL.text.equals(".TRUE.") ? "1" : "0"; }
     ;
 
 opcomp
@@ -620,17 +613,13 @@ casosp returns [String codigo]
          StringBuilder sb = new StringBuilder();
 
          for (String e : lista) {
-
-             if (e.contains("to")) {
+             if (e.startsWith("<") || e.startsWith(">")) {
+                 // límite superior/inferior: "< X" → "case < X:"  o "> X" → "case > X:"
                  sb.append("case ").append(e).append(":\n");
-             }
-             else if (e.startsWith("<")) {
-                 sb.append("case < ").append(e.substring(1)).append(":\n");
-             }
-             else if (e.startsWith(">")) {
-                 sb.append("case > ").append(e.substring(1)).append(":\n");
-             }
-             else {
+             } else if (e.contains(" to ")) {
+                 // rango: "X to Y" → "case X to Y:"
+                 sb.append("case ").append(e).append(":\n");
+             } else {
                  sb.append("case ").append(e).append(":\n");
              }
          }
@@ -654,21 +643,45 @@ etiquetas returns [List<String> lista]
     : simpvalue etiquetasp
       {
          $lista = new ArrayList<>();
-         $lista.addAll(expandCase($simpvalue.val));
-         $lista.addAll($etiquetasp.lista);
+         String sv = $simpvalue.val;
+         String ep = $etiquetasp.sufijo;
+         if (ep != null && ep.startsWith("to")) {
+             // caso0 : caso1  →  rango  →  "caso0 to caso1"
+             $lista.add(sv + " " + ep);
+         } else if (ep != null && ep.equals(">")) {
+             // caso3 :        →  límite inferior  →  "> caso3"
+             $lista.add("> " + sv);
+         } else {
+             // lista simple de valores
+             $lista.add(sv);
+             $lista.addAll($etiquetasp.lista);
+         }
       }
     | COLON simpvalue
       {
-         $lista = expandCase(":" + $simpvalue.val);
+         // : caso2  →  límite superior  →  "< caso2"
+         $lista = new ArrayList<>();
+         $lista.add("< " + $simpvalue.val);
       }
     ;
 
-etiquetasp returns [List<String> lista]
-    : listaetiquetas
-      { $lista = $listaetiquetas.lista; }
-    | COLON simpvaluep
+etiquetasp returns [List<String> lista, String sufijo]
+    : COLON simpvaluep
       {
-         $lista = expandCase($simpvaluep.val);
+         // caso3 :  →  límite inferior  →  "> caso3"
+         // caso0 : caso1  →  rango  →  "caso0 to caso1"
+         String sv = $simpvaluep.val;
+         if (sv != null && !sv.isEmpty()) {
+             $sufijo = "to " + sv;
+         } else {
+             $sufijo = ">";
+         }
+         $lista = new ArrayList<>();
+      }
+    | listaetiquetas
+      {
+         $lista = $listaetiquetas.lista;
+         $sufijo = null;
       }
     ;
 
@@ -676,7 +689,7 @@ listaetiquetas returns [List<String> lista]
     : COMMA simpvalue listaetiquetas
       {
          $lista = new ArrayList<>();
-         $lista.addAll(expandCase($simpvalue.val));
+         $lista.add($simpvalue.val);
          $lista.addAll($listaetiquetas.lista);
       }
     | { $lista = new ArrayList<>(); }
