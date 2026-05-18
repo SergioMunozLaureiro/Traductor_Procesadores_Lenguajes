@@ -195,12 +195,15 @@ asignacion returns [String codigo]
       {
          if (trad.getContexto().esAsignacionDeRetorno($IDENT.text))
              $codigo = "return " + $exp.codigo + ";";
+         else if (trad.esParametroReferencia($IDENT.text))
+             $codigo = "*" + $IDENT.text + " = " + $exp.codigo + ";";
          else
              $codigo = $IDENT.text + " = " + $exp.codigo + ";";
       }
     | proc_call SEMI
       { $codigo = $proc_call.codigo + ";"; }
     ;
+
 
 /* ============================
    DO / WHILE
@@ -221,8 +224,8 @@ sentdo returns [String codigo]
          String inc = $d3.val;
 
          $codigo = "for(" + var + " = " + ini + "; " +
-                           var + " <= " + fin + "; " +
-                           var + " += " + inc + ") {\n" +
+                           var + " != " + fin + "; " +
+                           var + " = " + var + " + " + inc + ") {\n" +
                    trad.indent($sentlist.codigo) +
                    "}";
       }
@@ -298,9 +301,10 @@ explist returns [String lista]
 proc_call returns [String codigo]
     : CALL IDENT subparamlist
       {
-         $codigo = $IDENT.text + "(" + $subparamlist.lista + ")";
+         $codigo = $IDENT.text + "(" + trad.procesarLlamada($IDENT.text, $subparamlist.lista) + ")";
       }
     ;
+
 
 subparamlist returns [String lista]
     : '(' exp explist ')'
@@ -316,16 +320,40 @@ ctelist
     : COMMA IDENT ASSIGN simpvalue ctelist
     |
     ;
-
 simpvalue returns [String val]
     : NUM_INT_CONST     { $val = $NUM_INT_CONST.text; }
     | NUM_REAL_CONST    { $val = $NUM_REAL_CONST.text; }
-    | STRING_CONST { $val = toCLiteral($STRING_CONST.text); }
-    | NUM_INT_CONST_B   { $val = $NUM_INT_CONST_B.text; }
-    | NUM_INT_CONST_O   { $val = $NUM_INT_CONST_O.text; }
-    | NUM_INT_CONST_H   { $val = $NUM_INT_CONST_H.text; }
-    | CONST_BOOL        { $val = $CONST_BOOL.text; }
+    | STRING_CONST      { $val = toCLiteral($STRING_CONST.text); }
+
+    // BINARIO → 0b...
+    | NUM_INT_CONST_B {
+         String raw = $NUM_INT_CONST_B.text;   // b'011'
+         String inner = raw.substring(2, raw.length()-1);
+         $val = "0b" + inner;
+      }
+
+    // OCTAL → 0o...
+    | NUM_INT_CONST_O {
+         String raw = $NUM_INT_CONST_O.text;
+         String inner = raw.substring(2, raw.length()-1);
+         $val = "0o" + inner;
+      }
+
+    // HEXA → 0x...
+    | NUM_INT_CONST_H {
+         String raw = $NUM_INT_CONST_H.text;
+         String inner = raw.substring(2, raw.length()-1);
+         $val = "0x" + inner;
+      }
+
+    // BOOLEANOS → 1 / 0
+    | CONST_BOOL {
+         if ($CONST_BOOL.text.equals(".TRUE.")) $val = "1";
+         else $val = "0";
+      }
     ;
+
+
 
 simpvaluep returns [String val]
     : simpvalue { $val = $simpvalue.val; }
@@ -392,6 +420,10 @@ dec_s_paramlist returns [List<Parametro> lista]
 
          $lista.add(p);
          $lista.addAll($dec_s_paramlist.lista);
+         if ($tipoparam.text.equals("OUT") || $tipoparam.text.equals("INOUT"))
+             p.esReferencia = true;
+
+
       }
     | { $lista = new ArrayList<>(); }
     ;
@@ -401,22 +433,28 @@ tipoparam
     | 'OUT'
     | 'INOUT'
     ;
-decfun
+decfun returns [String nombreRetorno]
     : 'FUNCTION' IDENT '(' nomparamlist ')' tipo '::' IDENT SEMI dec_f_paramlist 'END' 'FUNCTION' IDENT
       {
-         List<Parametro> params = new ArrayList<>();
-
          for (int i = 0; i < $nomparamlist.lista.size(); i++) {
              Parametro p = $nomparamlist.lista.get(i);
              Parametro q = $dec_f_paramlist.lista.get(i);
-
              p.tipo = q.tipo;
              p.esCadena = q.esCadena;
          }
 
-         trad.addDecFun($tipo.tipoC, $IDENT.text, $nomparamlist.lista);
+         // Comprobar nombre de función
+         if (!($IDENT(0).getText().equals($IDENT(2).getText()))) {
+             trad.error("Nombre de subprograma no coincide");
+         }
+
+         // Nombre de retorno
+         $nombreRetorno = $IDENT(1).getText();
+
+         trad.addDecFun($tipo.tipoC, $IDENT(0).getText(), $nomparamlist.lista);
       }
     ;
+
 
 dec_f_paramlist returns [List<Parametro> lista]
     : tipo COMMA 'INTENT' '(' 'IN' ')' IDENT SEMI dec_f_paramlist
@@ -429,11 +467,15 @@ dec_f_paramlist returns [List<Parametro> lista]
          else
              p = new Parametro($tipo.tipoC, $IDENT.text, true);
 
+         // IN → no referencia
+         p.esReferencia = false;
+
          $lista.add(p);
          $lista.addAll($dec_f_paramlist.lista);
       }
     | { $lista = new ArrayList<>(); }
     ;
+
 
 
 /* ============================
@@ -446,6 +488,7 @@ subproglist
     |
     ;
 
+
 codproc returns [String codigo]
     : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist dcllist sentlist 'END' 'SUBROUTINE' IDENT
       {
@@ -457,37 +500,53 @@ codproc returns [String codigo]
              p.tipo = q.tipo;
              p.esCadena = q.esCadena;
          }
+         if (!($IDENT(0).getText().equals($IDENT(1).getText()))) {
 
-         trad.getContexto().entrarProcedimiento($IDENT.text);
+             trad.error("Nombre de subprograma no coincide");
+         }
+
+
+
+
+
+         trad.getContexto().entrarProcedimiento($IDENT.text, $formal_paramlist.lista);
+
          trad.addProcedimiento($IDENT.text, $formal_paramlist.lista, $dcllist.listaVars, $sentlist.codigo);
          trad.getContexto().salir();
-         $codigo = "";
+
       }
     ;
-
-
-codfun returns [String codigo]
-    : 'FUNCTION' IDENT '(' nomparamlist ')' tipo '::' IDENT SEMI dec_f_paramlist dcllist sentlist IDENT ASSIGN exp SEMI 'END' 'FUNCTION' IDENT
+codfun returns [String nombreRetorno]
+    : 'FUNCTION' IDENT '(' nomparamlist ')' tipo '::' IDENT SEMI dec_f_paramlist
+      dcllist sentlist IDENT ASSIGN exp SEMI
+      'END' 'FUNCTION' IDENT
       {
-         // Combinar nombres (nomparamlist) con tipos (dec_f_paramlist)
          for (int i = 0; i < $nomparamlist.lista.size(); i++) {
              Parametro p = $nomparamlist.lista.get(i);
              Parametro q = $dec_f_paramlist.lista.get(i);
-
              p.tipo = q.tipo;
              p.esCadena = q.esCadena;
          }
 
-         trad.getContexto().entrarFuncion($IDENT.text, $tipo.tipoC);
+         // Comprobar nombre de función (IDENT(0) vs IDENT(3))
+         if (!($IDENT(0).getText().equals($IDENT(3).getText()))) {
+             trad.error("Nombre de subprograma no coincide");
+         }
+
+         $nombreRetorno = $IDENT(1).getText();
+
+         trad.getContexto().entrarFuncion($IDENT(0).getText(), $tipo.tipoC, $nomparamlist.lista);
 
          String cuerpo = $sentlist.codigo + "return " + $exp.codigo + ";";
 
-         trad.addFuncion($IDENT.text, $tipo.tipoC, $nomparamlist.lista, $dcllist.listaVars, cuerpo);
+         trad.addFuncion($IDENT(0).getText(), $tipo.tipoC, $nomparamlist.lista,
+                         $dcllist.listaVars, cuerpo, $nombreRetorno);
 
          trad.getContexto().salir();
-         $codigo = "";
       }
     ;
+
+
 
 
 /* ============================
@@ -505,16 +564,22 @@ expcondp returns [String codigo]
     | { $codigo = ""; }
     ;
 
-oplog
-    : '.OR.'
-    | '.AND.'
-    | '.EQV.'
-    | '.NEQV.'
+oplog returns [String text]
+    : '.OR.'   { $text = "||"; }
+    | '.AND.'  { $text = "&&"; }
+    | '.EQV.'  { $text = "!^"; }
+    | '.NEQV.' { $text = "^"; }
     ;
+
+
+
 
 factorcond returns [String codigo]
     : e1=exp opcomp e2=exp
-      { $codigo = $e1.codigo + $opcomp.text + $e2.codigo; }
+      {
+          String op = $opcomp.text.equals("/=") ? "!=" : $opcomp.text;
+          $codigo = $e1.codigo + op + $e2.codigo;
+      }
     | '(' expcond ')'
       { $codigo = "(" + $expcond.codigo + ")"; }
     | '.NOT.' factorcond
@@ -548,7 +613,6 @@ casos returns [String codigo]
       { $codigo = $casosp.codigo; }
     | { $codigo = ""; }
     ;
-
 casosp returns [String codigo]
     : '(' etiquetas ')' sentlist casos
       {
@@ -556,7 +620,19 @@ casosp returns [String codigo]
          StringBuilder sb = new StringBuilder();
 
          for (String e : lista) {
-             sb.append("case ").append(e).append(":\n");
+
+             if (e.contains("to")) {
+                 sb.append("case ").append(e).append(":\n");
+             }
+             else if (e.startsWith("<")) {
+                 sb.append("case < ").append(e.substring(1)).append(":\n");
+             }
+             else if (e.startsWith(">")) {
+                 sb.append("case > ").append(e.substring(1)).append(":\n");
+             }
+             else {
+                 sb.append("case ").append(e).append(":\n");
+             }
          }
 
          sb.append(trad.indent($sentlist.codigo));
@@ -572,6 +648,7 @@ casosp returns [String codigo]
                    "break;\n";
       }
     ;
+
 
 etiquetas returns [List<String> lista]
     : simpvalue etiquetasp
@@ -616,7 +693,7 @@ GT    : '>' ;
 GE    : '>=' ;
 LE    : '<=' ;
 EQ    : '==' ;
-NE    : '/=' ;
+NE : '/=' ;
 COLON : ':' ;
 COMMA : ',' ;
 SEMI  : ';' ;
