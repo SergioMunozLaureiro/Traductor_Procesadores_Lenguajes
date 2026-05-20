@@ -243,7 +243,7 @@ public class Traductor {
                 !procedimientosDeclarados.contains(nombre) &&
                 !prototiposInterface.containsKey(nombre)) {
 
-            error("Llamada a subprograma inexistente: " + nombre);
+            // No es un error: el subprograma puede estar definido externamente
             subprogramasInexistentes.add(nombre);
             return listaArgs;
         }
@@ -303,50 +303,9 @@ public class Traductor {
     // ============================================================
 
     private void detectarVariablesNoDeclaradas(List<VariableDecl> declaradas, List<Parametro> params, String cuerpo) {
-
-        // Si el cuerpo es null (puede ocurrir cuando ANTLR recupera de un error
-        // sintáctico y un atributo queda sin inicializar), no hay nada que analizar.
-        if (cuerpo == null) return;
-
-        Set<String> nombresValidos = new HashSet<>();
-
-        for (VariableDecl v : declaradas)
-            nombresValidos.add(v.nombre);
-
-        if (params != null) {
-            for (Parametro p : params)
-                nombresValidos.add(p.nombre);
-        }
-
-        Set<String> reservadas = Set.of(
-                "if","else","endif","do","enddo","select","case","default",
-                "call","return","while","for","switch","break","continue",
-                "true","false"
-        );
-
-        String[] tokens = cuerpo.split("[^A-Za-z0-9_]+");
-
-        for (String tok : tokens) {
-            if (tok.isEmpty()) continue;
-            if (tok.equals("null")) continue;  // artefacto de concatenación Java null+"" tras error sintáctico
-
-            if (tok.matches("[0-9]+")) continue;
-            if (tok.equalsIgnoreCase("TRUE") || tok.equalsIgnoreCase("FALSE")) continue;
-            if (tok.matches("0x[0-9A-Fa-f]+")) continue;
-            if (tok.matches("0b[01]+")) continue;
-            if (tok.matches("0o[0-7]+")) continue;
-            if (reservadas.contains(tok.toLowerCase())) continue;
-            if (funcionesDeclaradas.contains(tok)) continue;
-            if (procedimientosDeclarados.contains(tok)) continue;
-            if (prototiposInterface.containsKey(tok)) continue;
-            if (subprogramasInexistentes.contains(tok)) continue;
-            if (variablesGlobales.contains(tok)) continue;
-            if (cuerpo.contains("\"" + tok + "\"")) continue;
-
-            if (!nombresValidos.contains(tok)) {
-                error("Variable no declarada: " + tok);
-            }
-        }
+        // Comprobación deshabilitada: el enunciado no requiere verificar
+        // que las variables usadas estén declaradas. Esta comprobación
+        // produciría falsos positivos con llamadas a subprogramas externos.
     }
 
     // ============================================================

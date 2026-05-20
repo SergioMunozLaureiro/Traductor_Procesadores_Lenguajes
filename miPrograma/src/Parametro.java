@@ -13,8 +13,11 @@ public class Parametro {
 
     // Traducción a parámetro C
     public String toCParam() {
-        if (tipo.startsWith("char[")) {
-            return "char " + nombre + tipo.substring(4); // convierte char[10] → char nombre[10]
+        if (esCadena) {
+            // Parámetros de tipo cadena: siempre char nombre[] (sin dimensión)
+            if (esReferencia)
+                return "char *" + nombre;
+            return "char " + nombre + "[]";
         }
         if (esReferencia)
             return tipo + " *" + nombre;

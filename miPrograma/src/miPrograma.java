@@ -76,17 +76,12 @@ public class miPrograma {
             // ============================
             // GUARDAR ARCHIVO C
             // ============================
-            Path carpeta = Path.of("TRADUCCIONES");
-            if (!Files.exists(carpeta)) {
-                Files.createDirectory(carpeta);
-            }
+            String nombreEntrada = Path.of(rutaArchivo).getFileName().toString();
+            String nombreSalida = nombreEntrada.replace(".for", ".c");
 
-            String nombreSalida = Path.of(rutaArchivo)
-                    .getFileName()
-                    .toString()
-                    .replace(".for", ".c");
-
-            Path rutaSalida = carpeta.resolve(nombreSalida);
+            // Generar en el mismo directorio que el fichero de entrada
+            Path dirEntrada = Path.of(rutaArchivo).toAbsolutePath().getParent();
+            Path rutaSalida = dirEntrada.resolve(nombreSalida);
 
             Files.writeString(rutaSalida, codigoC);
 

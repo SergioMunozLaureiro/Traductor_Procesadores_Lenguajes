@@ -8,7 +8,15 @@ grammar gramatica;
     Traductor trad = new Traductor();
 
     public static String toCLiteral(String s) {
+        char delim = s.charAt(0);
         String inner = s.substring(1, s.length() - 1);
+        // Des-duplicar comillas del lenguaje fuente
+        if (delim == '\'') {
+            inner = inner.replace("''", "'");
+        } else {
+            inner = inner.replace("\"\"", "\"");
+        }
+        // Escapar comillas dobles para el lenguaje final (C)
         inner = inner.replace("\"", "\\\"");
         return "\"" + inner + "\"";
     }
@@ -165,7 +173,6 @@ sentlistp returns [String codigo]
 
 sent returns [String codigo]
     : asignacion { $codigo = s($asignacion.codigo) + "\n"; }
-    | proc_call SEMI { $codigo = s($proc_call.codigo) + ";\n"; }
     | 'IF' '(' expcond ')' sentif
       { $codigo = "if(" + s($expcond.codigo) + ") " + s($sentif.codigo) + "\n"; }
     | 'DO' sentdo
@@ -388,16 +395,28 @@ nomparamlistp returns [List<Parametro> lista]
 decproc
     : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist 'END' 'SUBROUTINE' IDENT
       {
+         // Comprobar que los nombres del SUBROUTINE coinciden
+         if (!($IDENT(0).getText().equals($IDENT(1).getText()))) {
+             trad.error("Nombre de subprograma no coincide en declaración SUBROUTINE: "
+                        + $IDENT(0).getText() + " vs " + $IDENT(1).getText());
+         }
+
          for (int i = 0; i < $formal_paramlist.lista.size(); i++) {
              Parametro p = $formal_paramlist.lista.get(i);
              Parametro q = $dec_s_paramlist.lista.get(i);
+
+             // Comprobar que los nombres de parámetros coinciden
+             if (!p.nombre.equals(q.nombre)) {
+                 trad.error("Nombre de parámetro no coincide en declaración SUBROUTINE "
+                            + $IDENT(0).getText() + ": " + p.nombre + " vs " + q.nombre);
+             }
 
              p.tipo = q.tipo;
              p.esCadena = q.esCadena;
              p.esReferencia = q.esReferencia;
          }
 
-         trad.addDecFun("void", $IDENT.text, $formal_paramlist.lista);
+         trad.addDecFun("void", $IDENT(0).getText(), $formal_paramlist.lista);
       }
     ;
 
@@ -410,14 +429,15 @@ dec_s_paramlist returns [List<Parametro> lista]
 
          if ($tipo.tipoC.equals("char") && $tipo.long > 0)
              p = new Parametro("char[" + $tipo.long + "]", $IDENT.text, true);
-         else
+         else if ($tipo.tipoC.equals("char"))
              p = new Parametro($tipo.tipoC, $IDENT.text, true);
+         else
+             p = new Parametro($tipo.tipoC, $IDENT.text, false);
 
          $lista.add(p);
          $lista.addAll($dec_s_paramlist.lista);
          if ($tipoparam.text.equals("OUT") || $tipoparam.text.equals("INOUT"))
              p.esReferencia = true;
-
 
       }
     | { $lista = new ArrayList<>(); }
@@ -434,16 +454,29 @@ decfun returns [String nombreRetorno]
          for (int i = 0; i < $nomparamlist.lista.size(); i++) {
              Parametro p = $nomparamlist.lista.get(i);
              Parametro q = $dec_f_paramlist.lista.get(i);
+
+             // Comprobar que los nombres de parámetros coinciden
+             if (!p.nombre.equals(q.nombre)) {
+                 trad.error("Nombre de parámetro no coincide en declaración FUNCTION "
+                            + $IDENT(0).getText() + ": " + p.nombre + " vs " + q.nombre);
+             }
+
              p.tipo = q.tipo;
              p.esCadena = q.esCadena;
          }
 
-         // Comprobar nombre de función
+         // Comprobar nombre de función (inicio vs fin)
          if (!($IDENT(0).getText().equals($IDENT(2).getText()))) {
-             trad.error("Nombre de subprograma no coincide");
+             trad.error("Nombre de subprograma no coincide en declaración FUNCTION: "
+                        + $IDENT(0).getText() + " vs " + $IDENT(2).getText());
          }
 
-         // Nombre de retorno
+         // Comprobar que el nombre de retorno coincide con el nombre de la función
+         if (!($IDENT(0).getText().equals($IDENT(1).getText()))) {
+             trad.error("Nombre de retorno no coincide con nombre de función: "
+                        + $IDENT(1).getText() + " vs " + $IDENT(0).getText());
+         }
+
          $nombreRetorno = $IDENT(1).getText();
 
          trad.addDecFun($tipo.tipoC, $IDENT(0).getText(), $nomparamlist.lista);
@@ -459,8 +492,10 @@ dec_f_paramlist returns [List<Parametro> lista]
 
          if ($tipo.tipoC.equals("char") && $tipo.long > 0)
              p = new Parametro("char[" + $tipo.long + "]", $IDENT.text, true);
-         else
+         else if ($tipo.tipoC.equals("char"))
              p = new Parametro($tipo.tipoC, $IDENT.text, true);
+         else
+             p = new Parametro($tipo.tipoC, $IDENT.text, false);
 
          // IN → no referencia
          p.esReferencia = false;
@@ -485,52 +520,75 @@ subproglist
 
 
 codproc returns [String codigo]
-    : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist dcllist sentlist 'END' 'SUBROUTINE' IDENT
+    : 'SUBROUTINE' IDENT formal_paramlist dec_s_paramlist
       {
+         // Entrar en contexto de procedimiento ANTES de parsear sentlist
+         // para que esParametroReferencia funcione
          for (int i = 0; i < $formal_paramlist.lista.size(); i++) {
              Parametro p = $formal_paramlist.lista.get(i);
-             Parametro q = $dec_s_paramlist.lista.get(i);
+             if (i < $dec_s_paramlist.lista.size()) {
+                 Parametro q = $dec_s_paramlist.lista.get(i);
 
-             p.tipo = q.tipo;
-             p.esCadena = q.esCadena;
-             p.esReferencia = q.esReferencia;
+                 if (!p.nombre.equals(q.nombre)) {
+                     trad.error("Nombre de parámetro no coincide en implementación SUBROUTINE "
+                                + $IDENT(0).getText() + ": " + p.nombre + " vs " + q.nombre);
+                 }
+
+                 p.tipo = q.tipo;
+                 p.esCadena = q.esCadena;
+                 p.esReferencia = q.esReferencia;
+             }
          }
+         trad.getContexto().entrarProcedimiento($IDENT(0).getText(), $formal_paramlist.lista);
+      }
+      dcllist sentlist 'END' 'SUBROUTINE' IDENT
+      {
          if (!($IDENT(0).getText().equals($IDENT(1).getText()))) {
-
-             trad.error("Nombre de subprograma no coincide");
+             trad.error("Nombre de subprograma no coincide en implementación SUBROUTINE: "
+                        + $IDENT(0).getText() + " vs " + $IDENT(1).getText());
          }
 
-
-
-
-
-         trad.getContexto().entrarProcedimiento($IDENT.text, $formal_paramlist.lista);
-
-         trad.addProcedimiento($IDENT.text, $formal_paramlist.lista, $dcllist.listaVars, $sentlist.codigo);
+         trad.addProcedimiento($IDENT(0).getText(), $formal_paramlist.lista, $dcllist.listaVars, $sentlist.codigo);
          trad.getContexto().salir();
-
       }
     ;
 codfun returns [String nombreRetorno]
     : 'FUNCTION' IDENT '(' nomparamlist ')' tipo '::' IDENT SEMI dec_f_paramlist
+      {
+         // Entrar en contexto de función ANTES de parsear sentlist
+         // para que esAsignacionDeRetorno funcione
+         for (int i = 0; i < $nomparamlist.lista.size(); i++) {
+             Parametro p = $nomparamlist.lista.get(i);
+             if (i < $dec_f_paramlist.lista.size()) {
+                 Parametro q = $dec_f_paramlist.lista.get(i);
+
+                 if (!p.nombre.equals(q.nombre)) {
+                     trad.error("Nombre de parámetro no coincide en implementación FUNCTION "
+                                + $IDENT(0).getText() + ": " + p.nombre + " vs " + q.nombre);
+                 }
+
+                 p.tipo = q.tipo;
+                 p.esCadena = q.esCadena;
+             }
+         }
+         trad.getContexto().entrarFuncion($IDENT(0).getText(), $tipo.tipoC, $nomparamlist.lista);
+      }
       dcllist sentlist
       'END' 'FUNCTION' IDENT
       {
-         for (int i = 0; i < $nomparamlist.lista.size(); i++) {
-             Parametro p = $nomparamlist.lista.get(i);
-             Parametro q = $dec_f_paramlist.lista.get(i);
-             p.tipo = q.tipo;
-             p.esCadena = q.esCadena;
-         }
-
          // Comprobar nombre de función (IDENT(0) vs IDENT(2))
          if (!($IDENT(0).getText().equals($IDENT(2).getText()))) {
-             trad.error("Nombre de subprograma no coincide");
+             trad.error("Nombre de subprograma no coincide en implementación FUNCTION: "
+                        + $IDENT(0).getText() + " vs " + $IDENT(2).getText());
+         }
+
+         // Comprobar que el nombre de retorno coincide con el nombre de la función
+         if (!($IDENT(0).getText().equals($IDENT(1).getText()))) {
+             trad.error("Nombre de retorno no coincide con nombre de función: "
+                        + $IDENT(1).getText() + " vs " + $IDENT(0).getText());
          }
 
          $nombreRetorno = $IDENT(1).getText();
-
-         trad.getContexto().entrarFuncion($IDENT(0).getText(), $tipo.tipoC, $nomparamlist.lista);
 
          trad.addFuncion($IDENT(0).getText(), $tipo.tipoC, $nomparamlist.lista,
                          $dcllist.listaVars, $sentlist.codigo, $nombreRetorno);
@@ -633,8 +691,7 @@ casosp returns [String codigo]
     | 'DEFAULT' sentlist
       {
          $codigo = "default:\n" +
-                   trad.indent($sentlist.codigo) +
-                   "break;\n";
+                   trad.indent($sentlist.codigo);
       }
     ;
 
